@@ -1,10 +1,12 @@
 #ifndef BOOTSTRAP_TERP_H
 #define BOOTSTRAP_TERP_H
 
+#include <cstdint>
+
 namespace basecode {
     // basecode interpreter which consumes base IR
     //
-    //register-based machine with a generic stack
+    // register-based machine with a generic stack
     // register file:
     // general purpose: data or address
     // I0-I63: integer registers 64-bit
@@ -24,14 +26,168 @@ namespace basecode {
     // non-used bits are zero-extended
     // store{.b|.w|.dw|.qw}
     // non-used bits are zero-extended
-    // addressing modes:
+    // addressing modes(loads & store):
     // {target-register}, [{source-register}]
     //     ”       “    ，[{source-register}. offset constant]
+    //
+    // copy {source-register}, {target-register}, {length constant}
+    // copy {source-register}, {target-register}, {length-register}
+    //
+    // fill {constant}, {target-register}, {length constant}
+    // fill {constant}, {target-register}, {length-register}
+    //
+    // fill {constant}, {target-register}, {length constant}
+    // fill {constant}, {target-register}, {length-register}
+    //
+    // fill {source-register}, {target-register}, {length constant}
+    // fill {source-register}, {target-register}, {length-register}
+    //
+    // register/constant
+    // move{.b|.w|.dw|.qw}
+    // move constant to register -- or -- register to register
+    // move.b #$06, I3
+    // mov I3, I16
+    // stack point: sp (like an IXX register)
+    // flags: fr (definitely read; maybe write)
+    // status: sr (definitely read; maybe write)
+    // --------------
+    // push{.b|.w|.dw|.qw}
+    // pop{.b|.w|.dw|.qw}
+    // sp register behaves like IXX register
+    // ALU
+    // -----------
+    //
+    // add{.b|.w|.dw|.qw}
+    // sub{.b|.w|.dw|.qw}
+    // mul{.b|.w|.dw|.qw}
+    // div{.b|.w|.dw|.qw}
+    // mod{.b|.w|.dw|.qw}
+    //
+    // size applicable to all: {.b|.w|.dw|.qw}
+    //
+    // shr
+    // shl
+    // ror
+    // rol
+    //
+    // and
+    // or
+    // xor
+    //
+    // bis (bit set)
+    // bic (bit clear)
+    // test
+    // tbz (test & branch if not set)
+    // tbnz (test & branch if set)
+    //
+    // cmp (compare register to register, or register to constant
+    // branch/conditional execution
+    // ------------------------------------
+    // bz (branch if zero)
+    // bz (branch if not zero)
+    // bne
+    // beq
+    // bae
+    // ba
+    // ble
+    // bl
+    // bo
+    // bcc
+    // bcs
+    //
+    // jsr
+    //      - equivalent to call (endcode tail flag?)
+    //          push current PC + sizeof(instruction)
+    //          jmp to address
+    // ret - jump to address on stack
+    // jmp
+    //      - absolute constant: jmp #$fffffff0
+    //      - indirect register: jmp [14]
+    //      - direct: jmp I4
+    // nop
+    //
+
+    struct register_file_t {
+        uint64_t i[64];
+        double f[64];
+        uint64_t pc;
+        uint64_t sp;
+        uint64_t fr;
+        uint64_t sr;
+    };
+
+    enum class opcode : uint16_t {
+        nop = 0,
+        load,
+        store,
+        move,
+        push,
+        pop,
+        add,
+        sub,
+        mul,
+        div,
+        mod,
+        neg,
+        shr,
+        shl,
+        ror,
+        rol,
+        and_op,
+        xor_op,
+        not_op,
+        bis,
+        bic,
+        test,
+        cmp,
+        bz,
+        bnz,
+        tbnz,
+        bne,
+        beq,
+        bea,
+        ba,
+        ble,
+        bl,
+        bo,
+        bcc,
+        bcs,
+        jsr,
+        ret,
+        jmp
+    };
+
+    enum class operand_types {
+        register_integer,
+        register_floating_point,
+        register_pc,
+        register_sp,
+        register_flags,
+        register_status,
+        constant
+    };
+
+    struct operand_enconding_t{
+        operand_types type;
+        uint8_t index;
+        uint64_t value;
+    };
+
+    struct instruction_t {
+        opcode op;
+        uint32_t line_number;
+        uint16_t colum_number;
+        uint8_t operand_count;
+        operand_enconding_t oprands[4];
+    };
+
     class terp {
     public:
+        terp();
 
+        virtual ~terp();
     private:
-
+        register_file_t _registers {};
     };
 }
 #endif //BOOTSTRAP_TERP_H
