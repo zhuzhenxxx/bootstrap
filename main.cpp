@@ -14,7 +14,7 @@ int main()
 
     std::cout << "heap size : " << terp.heap_size() << " qwords " << terp.heap_size_in_qwords() << std::endl;
 
-    auto regs = terp.register_file();
+    const auto& regs = terp.register_file();
     auto stack_op = regs.sp;
     std::cout << "regs.sp " << regs.sp << std::endl;
     terp.push(0x08);
