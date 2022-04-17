@@ -26,7 +26,7 @@ int main()
     auto t1 = terp.pop();
     auto t2 = terp.pop();
     auto t3 = terp.pop();
-    std::cout << "t1: " << t1 << " t2 " << t2 << " t3 " << t3 << std::endl;
+    std::cout << std::hex << "t1: " << t1 << " t2 " << t2 << " t3 " << t3 << std::endl;
 
     return 0;
 }
