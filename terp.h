@@ -2,6 +2,8 @@
 #define BOOTSTRAP_TERP_H
 
 #include <cstdint>
+#include <string>
+#include "result.h"
 
 namespace basecode {
     // basecode interpreter which consumes base IR
@@ -154,7 +156,9 @@ namespace basecode {
         bcs,
         jsr,
         ret,
-        jmp
+        jmp,
+        mate,
+        debug
     };
 
     enum class operand_types {
@@ -175,18 +179,33 @@ namespace basecode {
 
     struct instruction_t {
         opcode op;
-        uint32_t line_number;
-        uint16_t colum_number;
         uint8_t operand_count;
         operand_enconding_t oprands[4];
     };
 
+    struct debug_information_t {
+        uint32_t line_number;
+        uint16_t colum_number;
+        std::string symbol;
+        std::string source_file;
+    };
+
     class terp {
     public:
-        terp();
-
+        explicit terp(uint32_t heap_size);
         virtual ~terp();
+        bool initialize(result& r);
+
+        uint64_t pop();
+        void push(uint64_t value);
+
+        size_t heap_size() const;
+        size_t heap_size_in_qwords() const;
+        const register_file_t& register_file() const;
+
     private:
+        uint32_t _heap_size = 0;
+        uint64_t* _heap = nullptr;
         register_file_t _registers {};
     };
 }
