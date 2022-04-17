@@ -29,7 +29,7 @@ namespace basecode{
     uint64_t terp::pop()
     {
         uint64_t value = _heap[_registers.sp];
-        _registers.sp -= sizeof(uint64_t);
+        _registers.sp += sizeof(uint64_t);
         return value;
     }
 
@@ -39,16 +39,25 @@ namespace basecode{
         return;
     }
 
-    const register_file_t &terp::register_file() const {
+    const register_file_t &terp::register_file() const
+    {
         return _registers;
     }
 
-    size_t terp::heap_size_in_qwords() const {
+    size_t terp::heap_size_in_qwords() const
+    {
         return _heap_size / sizeof(uint64_t);
     }
 
-    size_t terp::heap_size() const {
+    size_t terp::heap_size() const
+    {
         return _heap_size;
+    }
+
+    bool terp::step(result &r)
+    {
+
+        return !r.is_failed();
     }
 }
 

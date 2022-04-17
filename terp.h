@@ -199,6 +199,8 @@ namespace basecode {
         uint64_t pop();
         void push(uint64_t value);
 
+        bool step(result& r);
+
         size_t heap_size() const;
         size_t heap_size_in_qwords() const;
         const register_file_t& register_file() const;
