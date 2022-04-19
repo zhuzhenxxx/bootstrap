@@ -3,11 +3,13 @@
 #include <fmt/printf.h>
 
 namespace basecode{
-    terp::terp(uint32_t heap_size) : _heap_size(heap_size){
+    terp::terp(uint32_t heap_size) : _heap_size(heap_size)
+    {
 
     }
 
-    terp::~terp() {
+    terp::~terp()
+    {
         delete _heap;
         _heap = nullptr;
     }
@@ -158,6 +160,7 @@ namespace basecode{
         instruction.op = static_cast<basecode::opcode>(static_cast<uint16_t>(*encoding_ptr + 1));
         instruction.size = static_cast<op_size>(static_cast<uint8_t>(*encoding_ptr + 3));
         instruction.operand_count = static_cast<uint8_t >(*(encoding_ptr + 4));
+
         _registers.pc += 64;
 
         return size;
@@ -181,7 +184,22 @@ namespace basecode{
         *(encoding_ptr + 3) = static_cast<uint8_t>(instruction.size);
         *(encoding_ptr + 4) = instruction.operand_count;
 
-        return 8;
+        size_t offset = 5;
+        for (size_t i = 0; i < instruction.operand_count; i++)
+        {
+            *(encoding_ptr + offset++) = static_cast<uint8_t>(instruction.oprands[i].type);
+            *(encoding_ptr + offset++) = instruction.oprands[i].index;
+            size += 2;
+            if (instruction.oprands[i].type == operand_types::constant)
+            {
+                uint64_t* constant_value_ptr = reinterpret_cast<uint64_t*>(encoding_ptr + offset);
+                *constant_value_ptr = instruction.oprands[i].value;
+                offset += sizeof(uint64_t);
+                size += sizeof(uint64_t);
+            }
+        }
+
+        return size;
     }
 
     void terp::dump_heap(uint64_t address, size_t size)
