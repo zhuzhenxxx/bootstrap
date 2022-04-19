@@ -136,6 +136,7 @@ namespace basecode {
         ror,
         rol,
         and_op,
+        or_op,
         xor_op,
         not_op,
         bis,
@@ -180,6 +181,7 @@ namespace basecode {
     struct instruction_t {
         opcode op;
         uint8_t operand_count;
+        uint8_t reserveds_count;
         operand_enconding_t oprands[4];
     };
 
@@ -204,6 +206,11 @@ namespace basecode {
         size_t heap_size() const;
         size_t heap_size_in_qwords() const;
         const register_file_t& register_file() const;
+
+        bool encode_instruction(result& r, uint64_t address, instruction_t instruction);
+
+    protected:
+        bool decode_instruction(result& r,instruction_t& instruction);
 
     private:
         uint32_t _heap_size = 0;
