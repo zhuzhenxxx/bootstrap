@@ -49,5 +49,37 @@ int main()
     fmt::print("t2 = ${:08x}\n", t2);
     fmt::print("t3 = ${:08x}\n", t3);
 
+    size_t inst_size = 0;
+    uint64_t location_counter = 0;
+
+    basecode::instruction_t nop;
+    nop.op = basecode::opcode::nop;
+    nop.operand_count = 0;
+
+    inst_size = terp.encode_instruction(r, location_counter, nop);
+    if (inst_size == 0)
+    {
+        print_result(r);
+        return 1;
+    }
+    location_counter += inst_size;
+
+    basecode::instruction_t move_constant_to_reg;
+    move_constant_to_reg.op = basecode::opcode::move;
+    move_constant_to_reg.size = basecode::op_size::byte;
+    move_constant_to_reg.operand_count = 2;
+    move_constant_to_reg.oprands[0].value = 0xff;
+    move_constant_to_reg.oprands[1].type = basecode::operand_types::constant;
+    move_constant_to_reg.oprands[0].index = 3;
+    move_constant_to_reg.oprands[1].type = basecode::operand_types::register_integer;
+
+    inst_size = terp.encode_instruction(r, location_counter, move_constant_to_reg);
+    if (inst_size == 0)
+    {
+        print_result(r);
+        return 1;
+    }
+    location_counter += inst_size;
+    terp.dump_heap(0);
     return 0;
 }

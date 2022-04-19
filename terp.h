@@ -119,7 +119,7 @@ namespace basecode {
     };
 
     enum class opcode : uint16_t {
-        nop = 0,
+        nop = 1,
         load,
         store,
         move,
@@ -163,13 +163,21 @@ namespace basecode {
     };
 
     enum class operand_types {
-        register_integer,
+        register_integer = 1,
         register_floating_point,
         register_pc,
         register_sp,
         register_flags,
         register_status,
         constant
+    };
+
+    enum class op_size : uint8_t {
+        none,
+        byte,
+        word,
+        dword,
+        qword
     };
 
     struct operand_enconding_t{
@@ -180,8 +188,8 @@ namespace basecode {
 
     struct instruction_t {
         opcode op;
+        op_size size = op_size::none;
         uint8_t operand_count;
-        uint8_t reserveds_count;
         operand_enconding_t oprands[4];
     };
 
@@ -201,16 +209,17 @@ namespace basecode {
         uint64_t pop();
         void push(uint64_t value);
 
+        void dump_heap(uint64_t address, size_t size = 256);
         bool step(result& r);
 
         size_t heap_size() const;
         size_t heap_size_in_qwords() const;
         const register_file_t& register_file() const;
 
-        bool encode_instruction(result& r, uint64_t address, instruction_t instruction);
+        size_t encode_instruction(result& r, uint64_t address, instruction_t instruction);
 
     protected:
-        bool decode_instruction(result& r,instruction_t& instruction);
+        size_t decode_instruction(result& r,instruction_t& instruction);
 
     private:
         uint32_t _heap_size = 0;

@@ -1,4 +1,6 @@
 #include "terp.h"
+#include "hex_formatter.h"
+#include <fmt/printf.h>
 
 namespace basecode{
     terp::terp(uint32_t heap_size) : _heap_size(heap_size){
@@ -57,7 +59,8 @@ namespace basecode{
     bool terp::step(result &r)
     {
         instruction_t inst;
-        if (!decode_instruction(r,inst))
+        auto inst_size = decode_instruction(r,inst);
+        if (inst_size == 0)
             return false;
 
         switch (inst.op) {
@@ -111,6 +114,8 @@ namespace basecode{
                 break;
             case opcode::bz:
                 break;
+            case opcode::bnz:
+                break;
             case opcode::tbnz:
                 break;
             case opcode::bne:
@@ -140,38 +145,51 @@ namespace basecode{
         return !r.is_failed();
     }
 
-    bool terp::decode_instruction(result& r, instruction_t &instruction)
+    size_t terp::decode_instruction(result& r, instruction_t &instruction)
     {
         if (_registers.pc % 8 != 0)
         {
             r.add_message("B003", "Instructions must be endcoded at 8-byte boundaries.", true);
-            return false;
+            return 0;
         }
         uint8_t* encoding_ptr = reinterpret_cast<uint8_t *>(&_heap[_registers.pc]);
 
-        instruction.op = static_cast<basecode::opcode>(static_cast<uint16_t>(*encoding_ptr));
-        instruction.operand_count = static_cast<uint8_t >(*(encoding_ptr + 2));
+        uint8_t size = *encoding_ptr;
+        instruction.op = static_cast<basecode::opcode>(static_cast<uint16_t>(*encoding_ptr + 1));
+        instruction.size = static_cast<op_size>(static_cast<uint8_t>(*encoding_ptr + 3));
+        instruction.operand_count = static_cast<uint8_t >(*(encoding_ptr + 4));
         _registers.pc += 64;
 
-        return true;
+        return size;
     }
 
-    bool terp::encode_instruction(result& r, uint64_t address, instruction_t instruction)
+    size_t terp::encode_instruction(result& r, uint64_t address, instruction_t instruction)
     {
         if (address % 8 != 0)
         {
             r.add_message("B003", "Instructions must be endcoded at 8-byte boundaries.", true);
-            return false;
+            return 0;
         }
 
+        address /= sizeof(uint64_t);
+
+        uint8_t size = 8;
         auto encoding_ptr = reinterpret_cast<uint8_t *>(_heap + address);
-
-        auto op_ptr = reinterpret_cast<uint16_t *>(encoding_ptr);
+        *encoding_ptr = size;
+        auto op_ptr = reinterpret_cast<uint16_t *>(encoding_ptr + 1);
         *op_ptr = static_cast<uint16_t >(instruction.op);
+        *(encoding_ptr + 3) = static_cast<uint8_t>(instruction.size);
+        *(encoding_ptr + 4) = instruction.operand_count;
 
-        *(encoding_ptr + 2) = instruction.operand_count;
+        return 8;
+    }
 
-        return true;
+    void terp::dump_heap(uint64_t address, size_t size)
+    {
+        auto program_memory = basecode::hex_formatter::dump_to_string(
+                reinterpret_cast<const void*>(_heap), size);
+
+        fmt::print("{}\n", program_memory);
     }
 }
 
