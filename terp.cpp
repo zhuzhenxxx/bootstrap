@@ -67,18 +67,47 @@ namespace basecode{
 
         switch (inst.op) {
             case opcode::nop:
+                fmt::print("nop\n");
                 break;
             case opcode::load:
                 break;
             case opcode::store:
                 break;
             case opcode::move:
+            {
+                fmt::print("move\n");
+                uint64_t  source_value;
+                if (!get_operand_value(r, inst, 0, source_value))
+                {
+                    return false;
+                }
+                if (!set_target_operand_value(r, inst, 1, source_value))
+                {
+                    return false;
+                }
                 break;
+            }
             case opcode::push:
+                fmt::print("push\n");
                 break;
             case opcode::pop:
+                fmt::print("pop\n");
                 break;
             case opcode::add:
+                uint64_t  lhs_value, rhs_value;
+                if (!get_operand_value(r, inst, 1, lhs_value))
+                {
+                    return false;
+                }
+                if (!get_operand_value(r, inst, 2, rhs_value))
+                {
+                    return false;
+                }
+                if (!set_target_operand_value(r, inst, 0, lhs_value + rhs_value))
+                {
+                    return false;
+                }
+                fmt::print("add\n");
                 break;
             case opcode::sub:
                 break;
@@ -154,14 +183,32 @@ namespace basecode{
             r.add_message("B003", "Instructions must be endcoded at 8-byte boundaries.", true);
             return 0;
         }
-        uint8_t* encoding_ptr = reinterpret_cast<uint8_t *>(&_heap[_registers.pc]);
-
+        uint8_t* encoding_ptr = reinterpret_cast<uint8_t *>(&_heap[_registers.pc / sizeof(uint64_t)]);
         uint8_t size = *encoding_ptr;
-        instruction.op = static_cast<basecode::opcode>(static_cast<uint16_t>(*encoding_ptr + 1));
-        instruction.size = static_cast<op_size>(static_cast<uint8_t>(*encoding_ptr + 3));
+
+        uint16_t* op_ptr = reinterpret_cast<uint16_t*>(encoding_ptr + 1);
+        instruction.op = static_cast<basecode::opcode>(*op_ptr);
+        instruction.size = static_cast<op_size>(static_cast<uint8_t>(*(encoding_ptr + 3)));
         instruction.operand_count = static_cast<uint8_t >(*(encoding_ptr + 4));
 
-        _registers.pc += 64;
+        size_t offset = 5;
+        for (size_t i = 0; i < instruction.operand_count; i++)
+        {
+            instruction.oprands[i].type = static_cast<operand_types>(*(encoding_ptr + offset));
+            ++offset;
+
+            instruction.oprands[i].index = *(encoding_ptr + offset);
+            ++offset;
+
+            instruction.oprands[i].value = 0;
+            if (instruction.oprands[i].type == operand_types::constant)
+            {
+                uint64_t* constant_value_ptr = reinterpret_cast<uint64_t*>(encoding_ptr + offset);
+                instruction.oprands[i].value = *constant_value_ptr;
+                offset += sizeof(uint64_t);
+            }
+        }
+        _registers.pc += size;
 
         return size;
     }
@@ -174,22 +221,27 @@ namespace basecode{
             return 0;
         }
 
-        address /= sizeof(uint64_t);
+        auto qword_address = address / sizeof(uint64_t);
+        uint8_t size = 4;
 
-        uint8_t size = 8;
-        auto encoding_ptr = reinterpret_cast<uint8_t *>(_heap + address);
-        *encoding_ptr = size;
+        auto encoding_ptr = reinterpret_cast<uint8_t *>(_heap + qword_address);
         auto op_ptr = reinterpret_cast<uint16_t *>(encoding_ptr + 1);
         *op_ptr = static_cast<uint16_t >(instruction.op);
+
         *(encoding_ptr + 3) = static_cast<uint8_t>(instruction.size);
         *(encoding_ptr + 4) = instruction.operand_count;
 
         size_t offset = 5;
         for (size_t i = 0; i < instruction.operand_count; i++)
         {
-            *(encoding_ptr + offset++) = static_cast<uint8_t>(instruction.oprands[i].type);
-            *(encoding_ptr + offset++) = instruction.oprands[i].index;
-            size += 2;
+            *(encoding_ptr + offset) = static_cast<uint8_t>(instruction.oprands[i].type);
+            ++offset;
+            ++size;
+
+            *(encoding_ptr + offset) = instruction.oprands[i].index;
+            ++offset;
+            ++size;
+
             if (instruction.oprands[i].type == operand_types::constant)
             {
                 uint64_t* constant_value_ptr = reinterpret_cast<uint64_t*>(encoding_ptr + offset);
@@ -199,6 +251,18 @@ namespace basecode{
             }
         }
 
+        if (instruction.operand_count > 0)
+        {
+            ++size;
+        }
+
+        if (size < 8)
+        {
+            size = 8;
+        }
+
+        size = static_cast<uint8_t >(align(size, sizeof(uint64_t)));
+        *encoding_ptr = size;
         return size;
     }
 
@@ -208,6 +272,162 @@ namespace basecode{
                 reinterpret_cast<const void*>(_heap), size);
 
         fmt::print("{}\n", program_memory);
+    }
+
+    size_t terp::align(uint64_t value, size_t size) const
+    {
+        auto offset = value % size;
+
+        return offset ? value + (size - offset) : value;
+    }
+
+    bool
+    terp::set_target_operand_value(result &r, const instruction_t &instruction, uint8_t operand_index, uint64_t value) {
+        switch (instruction.oprands[operand_index].type) {
+            case operand_types::register_integer:
+            {
+                _registers.i[instruction.oprands[operand_index].index] = value;
+                return true;
+            }
+            case operand_types::register_floating_point:
+                r.add_message("B009", "floating point registers connot be a target  for interger type.", true);
+                break;
+            case operand_types::register_sp:
+                break;
+            case operand_types::register_pc:
+                break;
+            case operand_types::register_flags:
+                break;
+            case operand_types::register_status:
+                break;
+            case operand_types::constant:
+                r.add_message("B006", "constant connot be a target operand type.", true);
+                break;
+        }
+
+        return false;
+    }
+
+    bool
+    terp::set_target_operand_value(result &r, const instruction_t &instruction, uint8_t operand_index, double value) {
+        switch (instruction.oprands[operand_index].type) {
+            case operand_types::register_integer:
+            {
+                r.add_message("B009", "interger point registers connot be a target  for interger type.", true);
+                break;
+            }
+            case operand_types::register_floating_point:
+                _registers.i[instruction.oprands[operand_index].index] = value;
+                break;
+            case operand_types::register_sp:
+                break;
+            case operand_types::register_pc:
+                break;
+            case operand_types::register_flags:
+                break;
+            case operand_types::register_status:
+                break;
+            case operand_types::constant:
+                r.add_message("B006", "constant connot be a target operand type.", true);
+                break;
+        }
+        return false;
+    }
+
+
+    bool terp::get_operand_value(result& r, const instruction_t& instruction, uint8_t operand_index, uint64_t& value) const
+    {
+        switch (instruction.oprands[operand_index].type)
+        {
+            case operand_types::register_integer:
+                value = _registers.i[instruction.oprands[operand_index].index];
+                break;
+            case operand_types::register_floating_point:
+
+                break;
+            case operand_types::register_sp:
+                value = _registers.sp;
+                break;
+            case operand_types::register_pc:
+                value = _registers.pc;
+                break;
+            case operand_types::register_flags:
+                value = _registers.fr;
+                break;
+            case operand_types::register_status:
+                value = _registers.sr;
+                break;
+            case operand_types::constant:
+                value = instruction.oprands[operand_index].value;
+                break;
+
+        }
+
+        // XXX: need to implement zero extend
+        switch (instruction.size) {
+            case op_size::byte:
+                break;
+            case op_size::word:
+                break;
+            case op_size::dword:
+                break;
+            case op_size::qword:
+                break;
+            default: {
+                r.add_message("B005", "unsupported size of 'none' for operand", true);
+                return false;
+            }
+        }
+        return true;
+    }
+
+
+    bool terp::get_operand_value(result &r, const instruction_t &instruction, uint8_t operand_index, double &value) const
+    {
+        switch (instruction.oprands[operand_index].type)
+        {
+            case operand_types::register_integer:
+                break;
+            case operand_types::register_floating_point:
+                value = _registers.i[instruction.oprands[operand_index].index];
+                break;
+            case operand_types::register_sp:
+                break;
+            case operand_types::register_pc:
+                break;
+            case operand_types::register_flags:
+                break;
+            case operand_types::register_status:
+                r.add_message("B005", "integer registers cannot be uesd for floating point operands", true);
+                break;
+            case operand_types::constant:
+                value = instruction.oprands[operand_index].value;
+                break;
+        }
+
+        return false;
+    }
+
+    void terp::dump_status()
+    {
+        fmt::print("BaseCode Interpreter State\n");
+        fmt::print("---------------------------------------\n");
+        fmt::print("IO={:08x} | I1={:08x} | I2={:08x} | I3={:08x}\n",
+                   _registers.i[0],
+                   _registers.i[1],
+                   _registers.i[2],
+                   _registers.i[3]);
+        fmt::print("I4={:08x} | I5={:08x} | I6={:08x} | I7={:08x}\n",
+                   _registers.i[4],
+                   _registers.i[5],
+                   _registers.i[6],
+                   _registers.i[7]);
+        fmt::print("\n");
+        fmt::print("PC={:08x} | SP={:08x} | FR={:08x} | SR={:08x}\n",
+                   _registers.pc,
+                   _registers.sp,
+                   _registers.fr,
+                   _registers.sr);
     }
 }
 

@@ -181,15 +181,15 @@ namespace basecode {
     };
 
     struct operand_enconding_t{
-        operand_types type;
-        uint8_t index;
-        uint64_t value;
+        operand_types type = operand_types::register_integer;
+        uint8_t index = 0;
+        uint64_t value = 0;
     };
 
     struct instruction_t {
-        opcode op;
+        opcode op = opcode::nop;
         op_size size = op_size::none;
-        uint8_t operand_count;
+        uint8_t operand_count = 0;
         operand_enconding_t oprands[4];
     };
 
@@ -209,6 +209,7 @@ namespace basecode {
         uint64_t pop();
         void push(uint64_t value);
 
+        void dump_status();
         void dump_heap(uint64_t address, size_t size = 256);
         bool step(result& r);
 
@@ -220,6 +221,14 @@ namespace basecode {
 
     protected:
         size_t decode_instruction(result& r,instruction_t& instruction);
+
+        size_t align(uint64_t value, size_t size) const;
+
+        bool set_target_operand_value(result& r, const instruction_t& instruction, uint8_t operand_index, uint64_t value);
+        bool set_target_operand_value(result& r, const instruction_t& instruction, uint8_t operand_index, double value);
+        bool get_operand_value(result& r, const instruction_t& instruction, uint8_t operand_index, uint64_t& value) const;
+        bool get_operand_value(result& r, const instruction_t& instruction, uint8_t operand_index, double& value) const;
+
 
     private:
         uint32_t _heap_size = 0;
